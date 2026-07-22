@@ -4011,10 +4011,22 @@ window.updateMsgSelectedPanel=function(){
 };
 
 window.loadTodayPtsForMsg=function(){
-  var rows=getLedger(todayStr()).filter(function(r){return !r._divider&&r.patientName;});
+  var todayDate=todayStr();
+  // 오늘 일계표 행 + 전체 일계표에서 appointmentDate=오늘인 행 모두 포함
+  var fromLedger=getLedger(todayDate).filter(function(r){return !r._divider&&r.patientName;});
+  var fromAppt=Object.values(S.ledger).flatMap(function(rs){return rs||[];})
+    .filter(function(r){return !r._divider&&r.patientName&&r.appointmentDate===todayDate;});
+  var allRows=fromLedger.concat(fromAppt);
+  // 중복 제거
+  var seen={};
+  allRows=allRows.filter(function(r){
+    var key=r.chartNumber||r.patientName;
+    if(seen[key])return false;
+    seen[key]=true;return true;
+  });
   var ptIds=[];
-  rows.forEach(function(r){
-    var pt=S.patients.find(function(p){return p.name===r.patientName||p.chartNumber===r.chartNumber;});
+  allRows.forEach(function(r){
+    var pt=S.patients.find(function(p){return p.chartNumber===r.chartNumber||(p.name===r.patientName&&!r.chartNumber);});
     if(pt&&!ptIds.includes(pt.id))ptIds.push(pt.id);
   });
   S.msgSelectedPts=ptIds;
@@ -4022,14 +4034,24 @@ window.loadTodayPtsForMsg=function(){
   S.msgText=undefined;
   S.msgSearchQ='';
   render();
-  showToast('오늘 예약자 '+ptIds.length+'명 선택됨 ✓');
+  showToast('오늘('+todayDate+') 예약자 '+ptIds.length+'명 선택됨 ✓');
 };
 
 window.loadTomorrowPtsForMsg=function(){
-  var rows=getLedger(addDays(todayStr(),1)).filter(function(r){return !r._divider&&r.patientName;});
+  var tmrDate=addDays(todayStr(),1);
+  // 전체 일계표에서 appointmentDate=내일인 행 검색 (오늘 일계표에 내일 예약 입력된 경우 포함)
+  var rows=Object.values(S.ledger).flatMap(function(rs){return rs||[];})
+    .filter(function(r){return !r._divider&&r.patientName&&r.appointmentDate===tmrDate;});
+  // 중복 제거
+  var seen={};
+  rows=rows.filter(function(r){
+    var key=r.chartNumber||r.patientName;
+    if(seen[key])return false;
+    seen[key]=true;return true;
+  });
   var ptIds=[];
   rows.forEach(function(r){
-    var pt=S.patients.find(function(p){return p.name===r.patientName||p.chartNumber===r.chartNumber;});
+    var pt=S.patients.find(function(p){return p.chartNumber===r.chartNumber||(p.name===r.patientName&&!r.chartNumber);});
     if(pt&&!ptIds.includes(pt.id))ptIds.push(pt.id);
   });
   S.msgSelectedPts=ptIds;
@@ -4037,7 +4059,7 @@ window.loadTomorrowPtsForMsg=function(){
   S.msgText=undefined;
   S.msgSearchQ='';
   render();
-  showToast('내일 예약자 '+ptIds.length+'명 선택됨 ✓');
+  showToast('내일('+tmrDate+') 예약자 '+ptIds.length+'명 선택됨 ✓');
 };
 
 window.sendMsgBulk=async function(){
